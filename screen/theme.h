@@ -14,20 +14,20 @@ extern dilemma_config_theme_t dilemma_config_theme;
 
 typedef struct {
     lv_style_t mod_btn;
+    lv_style_t mod_btn_pressed;
     lv_style_t bar;
     lv_style_t bar_background;
-    lv_style_t mod_btn_pressed;
-    lv_style_t flex_container;
-    lv_style_t line;
     lv_style_t layer_name;
+    lv_style_t line;
     lv_style_t line_background;
     lv_style_t secondary_labels;
     lv_style_t value_labels;
+    lv_style_t flex_container;
+    lv_style_t history_item_container;
 } ui_styles_t;
 
 extern ui_styles_t current_style;
 
-void load_themes(void);
 void read_dilemma_theme_config_from_eeprom(dilemma_config_theme_t *config);
 void load_dilemma_theme_config_from_eeprom(void);
 void write_dilemma_theme_config_to_eeprom(dilemma_config_theme_t *config);

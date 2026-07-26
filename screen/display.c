@@ -271,7 +271,6 @@ void init_custom_dashboard(void) {
     qp_lvgl_attach(lcd);
     qp_power(lcd, 1);
 
-    load_themes();
     init_styles();
 
     for (int i = 0; i < HISTORY_DEPTH; i++) {
@@ -292,9 +291,26 @@ void init_custom_dashboard(void) {
 
     ui_create_line_separator(main_cont, 1, 2);
 
-    // History slots
+    // 2. Create a parent container dedicated specifically to history items
+    lv_obj_t    *history_list_cont = lv_obj_create(main_cont);
+    ui_styles_t *styles            = get_current_ui_styles();
+    lv_obj_add_style(history_list_cont, &(styles->flex_container), LV_PART_MAIN);
+    lv_obj_set_layout(history_list_cont, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(history_list_cont, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(history_list_cont, 4, LV_PART_MAIN); // Gap between item cards
+    lv_obj_set_width(history_list_cont, LV_PCT(100));
+    lv_obj_set_height(history_list_cont, LV_SIZE_CONTENT);
+
+    // 3. Populate history slots using item containers
     for (int i = 0; i < HISTORY_DEPTH; i++) {
-        label_history[i] = ui_create_secondary_text(main_cont, history_buffers[i], false, 1);
+        // Individual item card wrapper
+        lv_obj_t *item_cnt = lv_obj_create(history_list_cont);
+        lv_obj_add_style(item_cnt, &(styles->history_item_container), LV_PART_MAIN);
+        lv_obj_set_width(item_cnt, LV_PCT(100));
+        lv_obj_set_height(item_cnt, LV_SIZE_CONTENT);
+
+        // Label inside its own container
+        label_history[i] = ui_create_secondary_text(item_cnt, history_buffers[i], false, 1);
         lv_obj_set_style_pad_top(label_history[i], 1, LV_PART_MAIN);
         lv_obj_set_style_pad_bottom(label_history[i], 1, LV_PART_MAIN);
     }
