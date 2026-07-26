@@ -23,6 +23,10 @@ static bool update_needed     = true;
 static bool chord_has_content = false;
 static bool combo_executed    = false; // Prevents trailing bare-mod releases from clogging history
 
+// View containers for full-screen state toggling
+static lv_obj_t *cont_active_fullscreen  = NULL;
+static lv_obj_t *cont_history_fullscreen = NULL;
+
 painter_device_t lcd;
 
 // Map standard keycodes to readable short strings
@@ -278,22 +282,53 @@ void init_custom_dashboard(void) {
     }
 
     ui_screen = lv_obj_create(NULL);
+    ui_styles_t *styles = get_current_ui_styles();
 
-    // Main layout container
-    lv_obj_t *main_cont = ui_create_container(ui_screen);
-    lv_obj_set_style_pad_row(main_cont, 2, LV_PART_MAIN);
+    // ==========================================
+    // 1. FULL-SCREEN ACTIVE / MODIFIER OVERLAY
+    // ==========================================
+    cont_active_fullscreen = ui_create_container(ui_screen);
+    lv_obj_set_size(cont_active_fullscreen, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_pad_all(cont_active_fullscreen, 8, LV_PART_MAIN);
 
-    ui_create_secondary_text(main_cont, "ACTIVE & HISTORY", true, 1);
+    // Distinct background/border styling or accent frame for active mode
+    lv_obj_add_style(cont_active_fullscreen, &(styles->history_item_container), LV_PART_MAIN);
 
-    // Live slot (Top)
-    label_live_combo = ui_create_number_label(main_cont, 2);
+    ui_create_secondary_text(cont_active_fullscreen, "ACTIVE MODIFIERS", true, 1);
+
+    // Prominent live combo display
+    label_live_combo = ui_create_number_label(cont_active_fullscreen, 2);
     lv_label_set_text(label_live_combo, live_buffer);
 
-    ui_create_line_separator(main_cont, 1, 2);
+    // Make text larger or centered for full-screen focus
+    lv_obj_set_style_text_align(label_live_combo, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
 
-    // 2. Create a parent container dedicated specifically to history items
-    lv_obj_t    *history_list_cont = lv_obj_create(main_cont);
-    ui_styles_t *styles            = get_current_ui_styles();
+    // Prominent live combo display
+    label_live_combo = ui_create_number_label(cont_active_fullscreen, 2);
+
+    // Apply the large font style
+    lv_obj_add_style(label_live_combo, &(styles->active_combo_label), LV_PART_MAIN);
+
+    // Center alignment & full width for clean display
+    lv_obj_set_width(label_live_combo, LV_PCT(100));
+    lv_label_set_text(label_live_combo, live_buffer);
+
+    // Hide active overlay by default (shown only when modifiers are active)
+    lv_obj_add_flag(cont_active_fullscreen, LV_OBJ_FLAG_HIDDEN);
+
+    // ==========================================
+    // 2. FULL-SCREEN HISTORY VIEW (NO MODS)
+    // ==========================================
+    cont_history_fullscreen = ui_create_container(ui_screen);
+    lv_obj_set_size(cont_history_fullscreen, LV_PCT(100), LV_PCT(100));
+    lv_obj_set_style_pad_row(cont_history_fullscreen, 4, LV_PART_MAIN);
+
+    ui_create_secondary_text(cont_history_fullscreen, "RECENT HISTORY", true, 1);
+
+    ui_create_line_separator(cont_history_fullscreen, 1, 2);
+
+    // History items list spanning full height
+    lv_obj_t *history_list_cont = lv_obj_create(cont_history_fullscreen);
     lv_obj_add_style(history_list_cont, &(styles->flex_container), LV_PART_MAIN);
     lv_obj_set_layout(history_list_cont, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(history_list_cont, LV_FLEX_FLOW_COLUMN);
@@ -325,12 +360,26 @@ void housekeeping_custom_dashboard(void) {
     if (!is_keyboard_left()) return;
 
     if (update_needed) {
-        lv_label_set_text(label_live_combo, live_buffer);
+        // Active if live_buffer isn't empty or default "-"
+        bool has_active_modifiers = (live_buffer[0] != '\0' && strcmp(live_buffer, "-") != 0);
 
-        for (int i = 0; i < HISTORY_DEPTH; i++) {
-            lv_label_set_text(label_history[i], history_buffers[i]);
+        if (has_active_modifiers) {
+            // Show Active Overlay, Hide History
+            lv_obj_clear_flag(cont_active_fullscreen, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(cont_history_fullscreen, LV_OBJ_FLAG_HIDDEN);
+
+            lv_label_set_text(label_live_combo, live_buffer);
+        } else {
+            // Show History, Hide Active Overlay
+            lv_obj_clear_flag(cont_history_fullscreen, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(cont_active_fullscreen, LV_OBJ_FLAG_HIDDEN);
+
+            for (int i = 0; i < HISTORY_DEPTH; i++) {
+                lv_label_set_text(label_history[i], history_buffers[i]);
+            }
         }
-        update_needed = false;
+
+        update_needed = false; // Reset flag after rendering frame
     }
 }
 

@@ -151,6 +151,12 @@ void init_styles(void) {
     lv_style_set_shadow_width(&(current_style.history_item_container), 4);
     lv_style_set_shadow_ofs_y(&(current_style.history_item_container), 2);
     lv_style_set_shadow_opa(&(current_style.history_item_container), LV_OPA_COVER);
+
+    // Active Large Label Style
+    lv_style_init(&(current_style.active_combo_label));
+    lv_style_set_text_font(&(current_style.active_combo_label), &lv_font_montserrat_24);
+    lv_style_set_text_color(&(current_style.active_combo_label), palette.text);
+    lv_style_set_text_align(&(current_style.active_combo_label), LV_TEXT_ALIGN_CENTER);
 }
 
 ui_styles_t *get_current_ui_styles(void) {

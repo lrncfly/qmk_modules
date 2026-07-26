@@ -10,6 +10,8 @@ typedef union {
     } __attribute__((packed));
 } dilemma_config_theme_t;
 
+LV_FONT_DECLARE(lv_font_montserrat_24);
+
 extern dilemma_config_theme_t dilemma_config_theme;
 
 typedef struct {
@@ -23,6 +25,7 @@ typedef struct {
     lv_style_t secondary_labels;
     lv_style_t value_labels;
     lv_style_t flex_container;
+    lv_style_t active_combo_label;
     lv_style_t history_item_container;
 } ui_styles_t;
 

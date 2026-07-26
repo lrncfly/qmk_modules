@@ -5,7 +5,6 @@ QUANTUM_PAINTER_DRIVERS += surface
 QUANTUM_PAINTER_LVGL_INTEGRATION = yes
 ST7789 = true
 
-
 BACKLIGHT_ENABLE = yes
 BACKLIGHT_DRIVER = pwm
 
@@ -16,3 +15,4 @@ VPATH += $(CURRENT_DIR)
 SRC += display.c
 SRC += ui_elements.c
 SRC += theme.c  # if ui_elements depends on theme
+SRC += fonts/lv_font_montserrat_24.c
