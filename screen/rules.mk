@@ -16,3 +16,4 @@ SRC += display.c
 SRC += ui_elements.c
 SRC += theme.c  # if ui_elements depends on theme
 SRC += fonts/lv_font_montserrat_24.c
+SRC += fonts/lv_font_montserrat_36.c

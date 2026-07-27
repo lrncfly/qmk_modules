@@ -154,9 +154,18 @@ void init_styles(void) {
 
     // Active Large Label Style
     lv_style_init(&(current_style.active_combo_label));
-    lv_style_set_text_font(&(current_style.active_combo_label), &lv_font_montserrat_24);
+    lv_style_set_text_font(&(current_style.active_combo_label), &lv_font_montserrat_36);
     lv_style_set_text_color(&(current_style.active_combo_label), palette.text);
     lv_style_set_text_align(&(current_style.active_combo_label), LV_TEXT_ALIGN_CENTER);
+
+    lv_obj_t *scr = lv_scr_act();
+
+    // Push top content down to clear rounded corners
+    lv_obj_set_style_pad_top(scr, 8, LV_PART_MAIN);
+
+    // Optional: Add left/right padding if text hits the side curves
+    lv_obj_set_style_pad_left(scr, 8, LV_PART_MAIN);
+    lv_obj_set_style_pad_right(scr, 8, LV_PART_MAIN);
 }
 
 ui_styles_t *get_current_ui_styles(void) {

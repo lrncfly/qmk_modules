@@ -11,7 +11,6 @@
 static lv_obj_t *ui_screen;
 
 // 1. Live Active Line
-static lv_obj_t *label_live_combo;
 static char      live_buffer[32] = "-";
 
 // 2. History Lines
@@ -26,8 +25,70 @@ static bool combo_executed    = false; // Prevents trailing bare-mod releases fr
 // View containers for full-screen state toggling
 static lv_obj_t *cont_active_fullscreen  = NULL;
 static lv_obj_t *cont_history_fullscreen = NULL;
+static lv_obj_t *mod_flex_container      = NULL; // Declared here so render_modifier_badges can access it
 
 painter_device_t lcd;
+
+/**
+ * @brief External/internal handler to update active key strings and trigger a display refresh
+ */
+void update_active_modifiers_display(const char *new_live_str) {
+    if (new_live_str != NULL) {
+        strncpy(live_buffer, new_live_str, sizeof(live_buffer) - 1);
+        live_buffer[sizeof(live_buffer) - 1] = '\0';
+        update_needed                        = true;
+    }
+}
+
+/**
+ * @brief Clears and dynamically populates badge containers for each modifier key in live_buffer
+ */
+static void render_modifier_badges(const char *buffer) {
+    if (!mod_flex_container) return;
+
+    // Clear previous badge objects from container
+    lv_obj_clean(mod_flex_container);
+
+    if (buffer == NULL || buffer[0] == '\0' || strcmp(buffer, "-") == 0) return;
+
+    ui_styles_t *styles = get_current_ui_styles();
+
+    // Copy buffer so strtok does not mutate original string
+    char buf_copy[32];
+    strncpy(buf_copy, buffer, sizeof(buf_copy) - 1);
+    buf_copy[sizeof(buf_copy) - 1] = '\0';
+
+    char *token = strtok(buf_copy, "+");
+    bool  first = true;
+
+    while (token != NULL) {
+        // --- 1. Render '+' Separator Box ---
+        if (!first) {
+            lv_obj_t *plus_cnt = lv_obj_create(mod_flex_container);
+            lv_obj_remove_style_all(plus_cnt);
+            lv_obj_set_size(plus_cnt, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+
+            lv_obj_t *plus_lbl = lv_label_create(plus_cnt);
+            lv_label_set_text(plus_lbl, "+");
+            // Apply active_combo_label style so text color (palette.text) and font are inherited
+            lv_obj_add_style(plus_lbl, &(styles->active_combo_label), LV_PART_MAIN);
+        }
+
+        // --- 2. Render Modifier / Key Badge Container ---
+        lv_obj_t *badge_cnt = lv_obj_create(mod_flex_container);
+        lv_obj_add_style(badge_cnt, &(styles->history_item_container), LV_PART_MAIN);
+        lv_obj_set_size(badge_cnt, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+
+        lv_obj_t *badge_lbl = lv_label_create(badge_cnt);
+        lv_label_set_text(badge_lbl, token);
+
+        // Apply active_combo_label style for text color & 24pt font
+        lv_obj_add_style(badge_lbl, &(styles->active_combo_label), LV_PART_MAIN);
+
+        first = false;
+        token = strtok(NULL, "+");
+    }
+}
 
 // Map standard keycodes to readable short strings
 static void append_keycode_name(char *buf, uint16_t keycode, size_t buf_size) {
@@ -101,8 +162,6 @@ static void append_keycode_name(char *buf, uint16_t keycode, size_t buf_size) {
 // Convert keycode directly into a modifier mask
 static uint8_t keycode_to_mod_mask(uint16_t keycode) {
     uint8_t mod_mask = 0;
-
-    // Clear BOTH Left and Right variants on release so no ghost shift remains
     switch (keycode) {
         case KC_LCTL:
         case KC_RCTL:
@@ -118,7 +177,6 @@ static uint8_t keycode_to_mod_mask(uint16_t keycode) {
             return (MOD_BIT(KC_LGUI) | MOD_BIT(KC_RGUI));
     }
 
-    // Handle Mod-Tap / Layer-Tap variations
     if (keycode >= QK_MOD_TAP && keycode <= QK_MOD_TAP_MAX) {
         uint8_t mod_type = (keycode >> 8) & 0x1F;
         if (mod_type & 0x01) mod_mask |= (MOD_BIT(KC_LCTL) | MOD_BIT(KC_RCTL));
@@ -126,7 +184,6 @@ static uint8_t keycode_to_mod_mask(uint16_t keycode) {
         if (mod_type & 0x04) mod_mask |= (MOD_BIT(KC_LALT) | MOD_BIT(KC_RALT));
         if (mod_type & 0x08) mod_mask |= (MOD_BIT(KC_LGUI) | MOD_BIT(KC_RGUI));
     }
-
     return mod_mask;
 }
 
@@ -149,62 +206,50 @@ static void push_to_history(const char *entry) {
     strncpy(history_buffers[0], entry, sizeof(history_buffers[0]));
 }
 
-// --- Fully Synchronized Key Capture Hook ---
 // --- Press-Driven Key Capture Hook ---
 bool process_record_custom_dashboard(uint16_t keycode, keyrecord_t *record) {
     bool is_tap_hold = (keycode >= QK_MOD_TAP && keycode <= QK_MOD_TAP_MAX) || (keycode >= QK_LAYER_TAP && keycode <= QK_LAYER_TAP_MAX);
 
     uint16_t basic_keycode = keycode;
-    if (is_tap_hold) {
-        basic_keycode = keycode & 0xFF;
-    } else if (keycode >= QK_MODS && keycode <= QK_MODS_MAX) {
+    if (is_tap_hold || (keycode >= QK_MODS && keycode <= QK_MODS_MAX)) {
         basic_keycode = keycode & 0xFF;
     }
 
     bool is_bare_mod = (basic_keycode == KC_LCTL || basic_keycode == KC_RCTL || basic_keycode == KC_LSFT || basic_keycode == KC_RSFT || basic_keycode == KC_LALT || basic_keycode == KC_RALT || basic_keycode == KC_LGUI || basic_keycode == KC_RGUI);
 
     uint8_t key_mod_mask = keycode_to_mod_mask(keycode);
-
-    // Filter strictly for physical/real modifiers — ignoring weak and oneshot mods
-    uint8_t real_mods = get_mods();
+    uint8_t real_mods    = get_mods();
 
     // -------------------------------------------------------------
     // EVENT 1: KEY RELEASED
     // -------------------------------------------------------------
     if (!record->event.pressed) {
-        // Calculate remaining real modifiers after stripping the releasing key
         uint8_t remaining_mods = real_mods & ~key_mod_mask;
 
         // Fast tapping of home-row mod keys (typing 'f' without holding)
         if (is_tap_hold && record->tap.count > 0 && remaining_mods == 0) {
-            strcpy(live_buffer, "-");
+            update_active_modifiers_display("-");
             chord_has_content = false;
-            update_needed     = true;
             return true;
         }
 
         if (chord_has_content) {
-            // Re-evaluate active display based solely on remaining held modifiers
             if (remaining_mods > 0) {
                 char mod_buf[32] = "";
                 build_modifier_string(mod_buf, remaining_mods, sizeof(mod_buf));
                 if (strlen(mod_buf) > 0 && mod_buf[strlen(mod_buf) - 1] == '+') {
                     mod_buf[strlen(mod_buf) - 1] = '\0';
                 }
-                strncpy(live_buffer, mod_buf, sizeof(live_buffer));
+                update_active_modifiers_display(mod_buf);
             } else {
-                // Bare modifier release: if held alone without executing a chord, log it to history
                 if (is_bare_mod && !combo_executed) {
                     push_to_history(live_buffer);
                 }
 
-                // Reset active line to idle
-                strcpy(live_buffer, "-");
+                update_active_modifiers_display("-");
                 chord_has_content = false;
                 combo_executed    = false;
             }
-
-            update_needed = true;
         }
         return true;
     }
@@ -212,7 +257,6 @@ bool process_record_custom_dashboard(uint16_t keycode, keyrecord_t *record) {
     // -------------------------------------------------------------
     // EVENT 2: KEY PRESSED
     // -------------------------------------------------------------
-
     uint8_t active_mods = real_mods;
     if (is_bare_mod || (is_tap_hold && record->tap.count == 0)) {
         active_mods |= key_mod_mask;
@@ -233,14 +277,12 @@ bool process_record_custom_dashboard(uint16_t keycode, keyrecord_t *record) {
             if (mod_buf[strlen(mod_buf) - 1] == '+') {
                 mod_buf[strlen(mod_buf) - 1] = '\0';
             }
-            strncpy(live_buffer, mod_buf, sizeof(live_buffer));
+            update_active_modifiers_display(mod_buf);
             chord_has_content = true;
 
-            // Reset combo flag if starting a fresh modifier hold
             if (active_mods == key_mod_mask) {
                 combo_executed = false;
             }
-            update_needed = true;
         }
         return true;
     }
@@ -251,21 +293,20 @@ bool process_record_custom_dashboard(uint16_t keycode, keyrecord_t *record) {
         build_modifier_string(chord_buf, active_mods, sizeof(chord_buf));
         append_keycode_name(chord_buf, basic_keycode, sizeof(chord_buf));
 
-        // Mark as combo so the bare modifier won't duplicate to history on release
         combo_executed = true;
 
-        // Instantly push to history and update live buffer on key press
         push_to_history(chord_buf);
-        strncpy(live_buffer, chord_buf, sizeof(live_buffer));
+        update_active_modifiers_display(chord_buf);
 
         chord_has_content = true;
-        update_needed     = true;
     }
 
     return true;
 }
 
-// --- Initialization ---
+/**
+ * @brief Initialize dashboard screens, layout elements, and container hierarchies
+ */
 void init_custom_dashboard(void) {
     wait_ms(LCD_WAIT_TIME);
 
@@ -290,30 +331,20 @@ void init_custom_dashboard(void) {
     cont_active_fullscreen = ui_create_container(ui_screen);
     lv_obj_set_size(cont_active_fullscreen, LV_PCT(100), LV_PCT(100));
     lv_obj_set_style_pad_all(cont_active_fullscreen, 8, LV_PART_MAIN);
-
-    // Distinct background/border styling or accent frame for active mode
     lv_obj_add_style(cont_active_fullscreen, &(styles->history_item_container), LV_PART_MAIN);
 
     ui_create_secondary_text(cont_active_fullscreen, "ACTIVE MODIFIERS", true, 1);
 
-    // Prominent live combo display
-    label_live_combo = ui_create_number_label(cont_active_fullscreen, 2);
-    lv_label_set_text(label_live_combo, live_buffer);
+    mod_flex_container = lv_obj_create(cont_active_fullscreen);
+    lv_obj_remove_style_all(mod_flex_container);
+    lv_obj_set_width(mod_flex_container, LV_PCT(100));
+    lv_obj_set_height(mod_flex_container, LV_SIZE_CONTENT);
+    lv_obj_set_layout(mod_flex_container, LV_LAYOUT_FLEX);
+    lv_obj_set_flex_flow(mod_flex_container, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(mod_flex_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(mod_flex_container, 4, LV_PART_MAIN);
+    lv_obj_set_style_pad_row(mod_flex_container, 4, LV_PART_MAIN);
 
-    // Make text larger or centered for full-screen focus
-    lv_obj_set_style_text_align(label_live_combo, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-
-    // Prominent live combo display
-    label_live_combo = ui_create_number_label(cont_active_fullscreen, 2);
-
-    // Apply the large font style
-    lv_obj_add_style(label_live_combo, &(styles->active_combo_label), LV_PART_MAIN);
-
-    // Center alignment & full width for clean display
-    lv_obj_set_width(label_live_combo, LV_PCT(100));
-    lv_label_set_text(label_live_combo, live_buffer);
-
-    // Hide active overlay by default (shown only when modifiers are active)
     lv_obj_add_flag(cont_active_fullscreen, LV_OBJ_FLAG_HIDDEN);
 
     // ==========================================
@@ -321,33 +352,31 @@ void init_custom_dashboard(void) {
     // ==========================================
     cont_history_fullscreen = ui_create_container(ui_screen);
     lv_obj_set_size(cont_history_fullscreen, LV_PCT(100), LV_PCT(100));
-    lv_obj_set_style_pad_row(cont_history_fullscreen, 4, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(cont_history_fullscreen, 8, LV_PART_MAIN);
 
     ui_create_secondary_text(cont_history_fullscreen, "RECENT HISTORY", true, 1);
-
     ui_create_line_separator(cont_history_fullscreen, 1, 2);
 
-    // History items list spanning full height
     lv_obj_t *history_list_cont = lv_obj_create(cont_history_fullscreen);
     lv_obj_add_style(history_list_cont, &(styles->flex_container), LV_PART_MAIN);
     lv_obj_set_layout(history_list_cont, LV_LAYOUT_FLEX);
     lv_obj_set_flex_flow(history_list_cont, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(history_list_cont, 4, LV_PART_MAIN); // Gap between item cards
+    lv_obj_set_style_pad_row(history_list_cont, 4, LV_PART_MAIN);
     lv_obj_set_width(history_list_cont, LV_PCT(100));
     lv_obj_set_height(history_list_cont, LV_SIZE_CONTENT);
 
-    // 3. Populate history slots using item containers
     for (int i = 0; i < HISTORY_DEPTH; i++) {
-        // Individual item card wrapper
         lv_obj_t *item_cnt = lv_obj_create(history_list_cont);
         lv_obj_add_style(item_cnt, &(styles->history_item_container), LV_PART_MAIN);
-        lv_obj_set_width(item_cnt, LV_PCT(100));
-        lv_obj_set_height(item_cnt, LV_SIZE_CONTENT);
+        lv_obj_set_size(item_cnt, LV_PCT(100), LV_SIZE_CONTENT);
 
-        // Label inside its own container
-        label_history[i] = ui_create_secondary_text(item_cnt, history_buffers[i], false, 1);
-        lv_obj_set_style_pad_top(label_history[i], 1, LV_PART_MAIN);
-        lv_obj_set_style_pad_bottom(label_history[i], 1, LV_PART_MAIN);
+        label_history[i] = lv_label_create(item_cnt);
+        lv_label_set_text(label_history[i], "-");
+
+        // Inherit text color from active_combo_label theme style
+        lv_obj_add_style(label_history[i], &(styles->active_combo_label), LV_PART_MAIN);
+        // Override font to 14pt for the smaller history items
+        lv_obj_set_style_text_font(label_history[i], &lv_font_montserrat_14, LV_PART_MAIN);
     }
 }
 
@@ -355,22 +384,21 @@ void load_custom_dashboard(void) {
     lv_scr_load(ui_screen);
 }
 
-// --- Render Loop ---
+/**
+ * @brief Housekeeping loop called on display redraw ticks
+ */
 void housekeeping_custom_dashboard(void) {
     if (!is_keyboard_left()) return;
 
     if (update_needed) {
-        // Active if live_buffer isn't empty or default "-"
         bool has_active_modifiers = (live_buffer[0] != '\0' && strcmp(live_buffer, "-") != 0);
 
         if (has_active_modifiers) {
-            // Show Active Overlay, Hide History
             lv_obj_clear_flag(cont_active_fullscreen, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(cont_history_fullscreen, LV_OBJ_FLAG_HIDDEN);
 
-            lv_label_set_text(label_live_combo, live_buffer);
+            render_modifier_badges(live_buffer);
         } else {
-            // Show History, Hide Active Overlay
             lv_obj_clear_flag(cont_history_fullscreen, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(cont_active_fullscreen, LV_OBJ_FLAG_HIDDEN);
 
@@ -379,7 +407,7 @@ void housekeeping_custom_dashboard(void) {
             }
         }
 
-        update_needed = false; // Reset flag after rendering frame
+        update_needed = false;
     }
 }
 

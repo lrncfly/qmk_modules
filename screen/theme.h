@@ -11,6 +11,7 @@ typedef union {
 } dilemma_config_theme_t;
 
 LV_FONT_DECLARE(lv_font_montserrat_24);
+LV_FONT_DECLARE(lv_font_montserrat_36);
 
 extern dilemma_config_theme_t dilemma_config_theme;
 
