@@ -55,6 +55,21 @@
 #    endif
 #endif
 
+#ifndef LCD_CHORD_HISTORY_COUNT
+#    define LCD_CHORD_HISTORY_COUNT 3
+#endif
+// Set to 0 to disable the recent chord history widget.
+
+#ifndef LCD_CHORD_HISTORY_TIMEOUT
+#    define LCD_CHORD_HISTORY_TIMEOUT 20000
+#endif
+// Set to 0 to keep history entries until they are evicted by newer chords.
+
+#ifndef LCD_CHORD_DISPLAY_TIMEOUT
+#    define LCD_CHORD_DISPLAY_TIMEOUT 5000
+#endif
+// Set to 0 to keep completed chords displayed until the next key event.
+
 // Custom display stuff
 #define BK_PALETTE LV_PALETTE_CYAN
 #define LAYER_MENU 4
