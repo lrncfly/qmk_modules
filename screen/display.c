@@ -52,7 +52,7 @@ void init_custom_dashboard(void) {
 
     // Power display screen on
     qp_power(lcd, 1);
-    qp_rect(lcd, 0, 0, LCD_WIDTH, LCD_HEIGHT, HSV_BLACK, true);
+    qp_rect(lcd, 0, 0, LCD_WIDTH + LCD_MARGIN, LCD_HEIGHT + LCD_MARGIN, HSV_BLACK, true);
     qp_flush(lcd);
 
     // 2. Load the general formatting themes

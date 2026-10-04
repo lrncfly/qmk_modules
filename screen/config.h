@@ -24,6 +24,7 @@
 #define LCD_OFFSET_Y 15
 #define LCD_WIDTH 240  // Set according to your display specs
 #define LCD_HEIGHT 280 // Set according to your display specs
+#define LCD_MARGIN 10  // margin for the display to avoid clipping, set according to your display specs
 #define SPI_MODE 3     // Set according to your display specs
 #define ST7789         // Set according to your display specs GC_9A01 or ST7789
 #ifdef QUANTUM_PAINTER_SUPPORTS_NATIVE_COLORS
