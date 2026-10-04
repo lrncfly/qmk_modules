@@ -38,6 +38,10 @@ static lv_obj_t *label_rgb_val;
 
 painter_device_t lcd; // Global pointer for the driver
 
+static uint32_t last_screen_activity;
+static uint8_t screen_backlight_level;
+static bool screen_timed_out;
+
 // --- Initialization Phase ---
 void init_custom_dashboard(void) {
     // 1. Low-level hardware initialization sequence
@@ -122,10 +126,30 @@ void init_custom_dashboard(void) {
     lv_obj_clear_flag(cont_default_view, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(cont_pointer_view, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_flag(cont_media_view, LV_OBJ_FLAG_HIDDEN);
+
+    screen_backlight_level = get_backlight_level();
+    last_screen_activity = timer_read32();
+    screen_timed_out = false;
 }
 
 void load_custom_dashboard(void) {
     lv_scr_load(ui_screen);
+}
+
+void screen_note_activity(void) {
+    if (!is_keyboard_left()) return;
+
+    last_screen_activity = timer_read32();
+    if (screen_timed_out) {
+        qp_power(lcd, 1);
+        backlight_set(screen_backlight_level);
+        screen_timed_out = false;
+    } else {
+        uint8_t current_backlight_level = get_backlight_level();
+        if (current_backlight_level > 0) {
+            screen_backlight_level = current_backlight_level;
+        }
+    }
 }
 
 static void update_transient_mod(lv_obj_t *obj, uint8_t mod_mask, uint8_t current_mods) {
@@ -140,6 +164,19 @@ static void update_transient_mod(lv_obj_t *obj, uint8_t mod_mask, uint8_t curren
 // --- Dynamic Rendering & Visibility Loop ---
 void housekeeping_custom_dashboard(void) {
     if (!is_keyboard_left()) return;
+
+#if LCD_SCREEN_TIMEOUT > 0
+    if (!screen_timed_out && timer_elapsed32(last_screen_activity) >= LCD_SCREEN_TIMEOUT) {
+        uint8_t current_backlight_level = get_backlight_level();
+        if (current_backlight_level > 0) {
+            screen_backlight_level = current_backlight_level;
+        }
+        backlight_set(0);
+        qp_power(lcd, 0);
+        screen_timed_out = true;
+        return;
+    }
+#endif
 
     // 1. Resolve active keyboard state from QMK core
     uint8_t highest_layer = get_highest_layer(layer_state);

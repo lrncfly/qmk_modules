@@ -44,4 +44,5 @@ void module_sync_handler(uint8_t initiator2target_buffer_size,
 void init_custom_dashboard(void);
 void load_custom_dashboard(void);
 void housekeeping_custom_dashboard(void);
+void screen_note_activity(void);
 #endif

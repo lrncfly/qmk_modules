@@ -47,7 +47,13 @@
 #endif
 #define QP_LVGL_TASK_PERIOD 66 // throttle lvgl for keyboard responsiveness
 
-// #define QUANTUM_PAINTER_DISPLAY_TIMEOUT 5000
+#ifndef LCD_SCREEN_TIMEOUT
+#    ifdef RGB_MATRIX_TIMEOUT
+#        define LCD_SCREEN_TIMEOUT RGB_MATRIX_TIMEOUT
+#    else
+#        define LCD_SCREEN_TIMEOUT 60000
+#    endif
+#endif
 
 // Custom display stuff
 #define BK_PALETTE LV_PALETTE_CYAN
