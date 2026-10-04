@@ -1,8 +1,5 @@
 #pragma once
 
-// TODO move this to a module definition, move the dilemma sync definition to the sync module
-// #define SPLIT_TRANSACTION_IDS_KB RPC_ID_KEYCODE_SYNC, RPC_ID_DILEMMA_SYNC
-
 // QP stuff
 #define SPI_SCK_PIN GP22  // as per vik connector
 #define SPI_MOSI_PIN GP23 // as per vik connector

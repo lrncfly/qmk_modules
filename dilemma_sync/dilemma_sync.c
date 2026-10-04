@@ -32,15 +32,15 @@ void dilemma_sync_handler(uint8_t initiator2target_buffer_size, const void* init
 }
 
 void update_dilemma_status(void) {
-    dilemma_status.mods = get_mods();
-    dilemma_status.layer = get_highest_layer(layer_state);
-    dilemma_status.sniping = dilemma_get_pointer_sniping_enabled();
-    dilemma_status.dpi = dilemma_get_pointer_default_dpi();
-    dilemma_status.s_dpi = dilemma_get_pointer_sniping_dpi();
-    dilemma_status.scrolling = dilemma_get_pointer_dragscroll_enabled();
-    dilemma_status.rgb_enabled = rgb_matrix_is_enabled();
+    dilemma_status.mods            = get_mods();
+    dilemma_status.layer           = get_highest_layer(layer_state);
+    dilemma_status.sniping         = bkpd_get_pointer_sniping_enabled();
+    dilemma_status.dpi             = bkpd_get_pointer_default_dpi();
+    dilemma_status.s_dpi           = bkpd_get_pointer_sniping_dpi();
+    dilemma_status.scrolling       = bkpd_get_pointer_dragscroll_enabled();
+    dilemma_status.rgb_enabled     = rgb_matrix_is_enabled();
     dilemma_status.rgb_effect_mode = rgb_matrix_get_mode();
-    dilemma_status.rgb_val = rgb_matrix_get_val();
+    dilemma_status.rgb_val         = rgb_matrix_get_val();
 }
 
 const dilemma_status_t get_dilemma_status(void) {

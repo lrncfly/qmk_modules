@@ -1,9 +1,10 @@
 #include QMK_KEYBOARD_H
 #include "screen.h"
-#include "dilemma_sync.h"
+#include "bk_pointing_device.h"
 #include "layers.h"
 #include "lvgl.h"
 #include "qp.h"
+#include "color.h"
 #include "ui_elements.h"
 
 // Master Screen Slate
@@ -35,9 +36,6 @@ static lv_obj_t *label_lcd_val;
 static lv_obj_t *bar_rgb;
 static lv_obj_t *label_rgb_val;
 
-// Helper to safely fetch dilemma state (borrowed conceptually from base screen logic)
-extern dilemma_status_t get_dilemma_status(void);
-
 painter_device_t lcd; // Global pointer for the driver
 
 // --- Initialization Phase ---
@@ -54,6 +52,8 @@ void init_custom_dashboard(void) {
 
     // Power display screen on
     qp_power(lcd, 1);
+    qp_rect(lcd, 0, 0, LCD_WIDTH, LCD_HEIGHT, HSV_BLACK, true);
+    qp_flush(lcd);
 
     // 2. Load the general formatting themes
     load_themes();
@@ -61,6 +61,8 @@ void init_custom_dashboard(void) {
 
     // 3. NOW it is 100% safe to build your layout objects!
     ui_screen = lv_obj_create(NULL);
+    lv_obj_clear_flag(ui_screen, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(ui_screen, LV_SCROLLBAR_MODE_OFF);
 
     // Create the master base column wrapper
     lv_obj_t *main_cont = ui_create_container(ui_screen);
@@ -139,9 +141,8 @@ static void update_transient_mod(lv_obj_t *obj, uint8_t mod_mask, uint8_t curren
 void housekeeping_custom_dashboard(void) {
     if (!is_keyboard_left()) return;
 
-    // 1. Resolve active hardware status variables from QMK core layer
-    dilemma_status_t status        = get_dilemma_status();
-    uint8_t          highest_layer = get_highest_layer(layer_state);
+    // 1. Resolve active keyboard state from QMK core
+    uint8_t highest_layer = get_highest_layer(layer_state);
 
     // 2. Run Context Visibility Toggling & Layer Name Updates
     static uint8_t last_rendered_layer = 255;
@@ -169,9 +170,6 @@ void housekeeping_custom_dashboard(void) {
             case LAYER_SYMBOLS:
                 lv_label_set_text(label_status_tag, "SYMBOLS");
                 break;
-            case LAYER_LCD:
-                lv_label_set_text(label_status_tag, "LCD CNFG");
-                break;
             default:
                 lv_label_set_text(label_status_tag, "UNKNOWN");
                 break;
@@ -190,7 +188,6 @@ void housekeeping_custom_dashboard(void) {
                 lv_obj_clear_flag(cont_pointer_view, LV_OBJ_FLAG_HIDDEN);
                 break;
             case LAYER_MEDIA:
-            case LAYER_LCD:
                 lv_obj_clear_flag(cont_media_view, LV_OBJ_FLAG_HIDDEN);
                 break;
             default:
@@ -221,15 +218,17 @@ void housekeeping_custom_dashboard(void) {
         char val_str[12];
 
         // Trackpad Main DPI
-        snprintf(val_str, sizeof(val_str), "%u", status.dpi);
+        uint16_t current_dpi = bkpd_get_pointer_default_dpi();
+        snprintf(val_str, sizeof(val_str), "%u", current_dpi);
         lv_label_set_text(label_dpi_val, val_str);
-        float dpi_rel = (float)((status.dpi + 200 - 400)) * 100 / (200 * 16);
+        float dpi_rel = (float)((current_dpi + 200 - 400)) * 100 / (200 * 16);
         lv_bar_set_value(bar_dpi, (uint16_t)dpi_rel, LV_ANIM_OFF);
 
         // Sniper Mode DPI
-        snprintf(val_str, sizeof(val_str), "%u", status.s_dpi);
+        uint16_t current_snipe_dpi = bkpd_get_pointer_sniping_dpi();
+        snprintf(val_str, sizeof(val_str), "%u", current_snipe_dpi);
         lv_label_set_text(label_snipe_val, val_str);
-        float snipe_rel = (float)((status.s_dpi + 100 - 200)) * 100 / (100 * 4);
+        float snipe_rel = (float)((current_snipe_dpi + 100 - 200)) * 100 / (100 * 4);
         lv_bar_set_value(bar_snipe, (uint16_t)snipe_rel, LV_ANIM_OFF);
     } else if (!lv_obj_has_flag(cont_media_view, LV_OBJ_FLAG_HIDDEN)) {
         char val_str[12];

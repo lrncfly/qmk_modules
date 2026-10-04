@@ -5,6 +5,8 @@
 
 lv_obj_t *ui_create_container(lv_obj_t *parent) {
     lv_obj_t *cont = lv_obj_create(parent);
+    lv_obj_clear_flag(cont, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scrollbar_mode(cont, LV_SCROLLBAR_MODE_OFF);
     lv_obj_set_size(cont, LCD_WIDTH, LCD_HEIGHT);
     lv_obj_center(cont);
     lv_obj_set_flex_flow(cont, LV_FLEX_FLOW_ROW_WRAP);
