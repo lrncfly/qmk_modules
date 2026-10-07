@@ -1,5 +1,6 @@
 #include QMK_KEYBOARD_H
 #include "dilemma_sync.h"
+#include "bk_pointing_device.h"
 #include "transactions.h"
 
 dilemma_status_t dilemma_status = { 0 };
@@ -34,9 +35,9 @@ void dilemma_sync_handler(uint8_t initiator2target_buffer_size, const void* init
 void update_dilemma_status(void) {
     dilemma_status.mods            = get_mods();
     dilemma_status.layer           = get_highest_layer(layer_state);
-    dilemma_status.sniping         = bkpd_get_pointer_sniping_enabled();
-    dilemma_status.dpi             = bkpd_get_pointer_default_dpi();
-    dilemma_status.s_dpi           = bkpd_get_pointer_sniping_dpi();
+    dilemma_status.sniping         = bkpd_mode_is_sniping();
+    dilemma_status.dpi             = bkpd_mode_get_dpi(MODE_NORMAL);
+    dilemma_status.s_dpi           = bkpd_mode_get_dpi(MODE_SNIPING);
     dilemma_status.scrolling       = bkpd_get_pointer_dragscroll_enabled();
     dilemma_status.rgb_enabled     = rgb_matrix_is_enabled();
     dilemma_status.rgb_effect_mode = rgb_matrix_get_mode();
