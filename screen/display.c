@@ -1,8 +1,6 @@
 #include QMK_KEYBOARD_H
 #include "screen.h"
-#include "argos_rgb.h"
-#include "bk_pointing_device.h"
-#include "layers.h"
+#include "screen_data.h"
 #include "lvgl.h"
 #include "qp.h"
 #include "color.h"
@@ -102,36 +100,17 @@ static uint32_t chord_history_times[LCD_CHORD_HISTORY_COUNT];
 static uint8_t chord_history_count;
 #endif
 
-static const char *get_layer_display_name(uint8_t layer) {
-    if (layer == LAYER_BASE) {
-        return "BASE";
-    }
-    const char *name = dilemma_layer_name(layer);
-    return name ? name : "UNKNOWN";
-}
-
+static void update_layer_display(const screen_dashboard_data_t *data) {
+    lv_label_set_text(label_status_tag, data->status_text);
+    lv_label_set_text(chord_layer_label, data->layer_name);
 #ifdef RGB_MATRIX_ENABLE
-static RGB get_layer_display_rgb(uint8_t layer) {
-    RGB rgb;
-    if (argos_rgb_get_layer_color(layer, &rgb)) {
-        return rgb;
-    }
-    return dilemma_layer_indicator_rgb(layer);
-}
-#endif
-
-static void update_layer_display(uint8_t layer) {
-    const char *name = get_layer_display_name(layer);
-    const char *status = layer == LAYER_BASE && !is_keyboard_master() ? "SECONDARY" : name;
-    lv_label_set_text(label_status_tag, status);
-    lv_label_set_text(chord_layer_label, name);
-#ifdef RGB_MATRIX_ENABLE
-    RGB rgb = get_layer_display_rgb(layer);
-    last_displayed_layer_rgb = rgb;
+    last_displayed_layer_rgb = data->layer_rgb;
     displayed_layer_rgb_valid = true;
-    lv_color_t background = lv_color_make(rgb.r, rgb.g, rgb.b);
+    lv_color_t background = lv_color_make(data->layer_rgb.r, data->layer_rgb.g, data->layer_rgb.b);
     lv_color_t foreground = lv_color_white();
-    if ((uint32_t)rgb.r * 299 + (uint32_t)rgb.g * 587 + (uint32_t)rgb.b * 114 > 128000) {
+    if ((uint32_t)data->layer_rgb.r * 299 + (uint32_t)data->layer_rgb.g * 587 +
+            (uint32_t)data->layer_rgb.b * 114 >
+        128000) {
         foreground = lv_color_black();
     }
 
@@ -212,7 +191,7 @@ void init_custom_dashboard(void) {
     // ==========================================
     // Header Zone: Status Indicator (Primary/Secondary)
     label_status_tag = ui_create_layer_label(main_cont);
-    lv_label_set_text(label_status_tag, is_keyboard_master() ? "" : "SECONDARY");
+    lv_label_set_text(label_status_tag, "");
 
     ui_create_line_separator(main_cont, 1, 3);
 
@@ -286,7 +265,9 @@ void init_custom_dashboard(void) {
     lv_obj_set_style_text_color(chord_label, lv_color_white(), 0);
     lv_obj_set_style_text_line_space(chord_label, 8, 0);
     lv_obj_align(chord_label, LV_ALIGN_TOP_MID, 0, 48);
-    update_layer_display(get_highest_layer(layer_state));
+    screen_dashboard_data_t dashboard_data;
+    lrncfly_screen_get_dashboard_data(&dashboard_data);
+    update_layer_display(&dashboard_data);
 
     // Default visibility settings at startup
     lv_obj_clear_flag(cont_default_view, LV_OBJ_FLAG_HIDDEN);
@@ -606,13 +587,15 @@ void housekeeping_custom_dashboard(void) {
     }
 #endif
 
-    // 1. Resolve active keyboard state from QMK core
-    uint8_t highest_layer = get_highest_layer(layer_state);
+    // 1. Resolve active keyboard state through the keymap data adapter
+    screen_dashboard_data_t dashboard_data;
+    lrncfly_screen_get_dashboard_data(&dashboard_data);
+    uint8_t highest_layer = dashboard_data.layer;
 
     // 2. Run Context Visibility Toggling & Layer Name Updates
     static uint8_t last_rendered_layer = 255;
 #ifdef RGB_MATRIX_ENABLE
-    RGB current_layer_rgb = get_layer_display_rgb(highest_layer);
+    RGB current_layer_rgb = dashboard_data.layer_rgb;
     bool layer_color_changed = !displayed_layer_rgb_valid ||
                                current_layer_rgb.r != last_displayed_layer_rgb.r ||
                                current_layer_rgb.g != last_displayed_layer_rgb.g ||
@@ -627,12 +610,11 @@ void housekeeping_custom_dashboard(void) {
         lv_obj_add_flag(cont_media_view, LV_OBJ_FLAG_HIDDEN);
 
         // Selectively awake the target context container
-        switch (highest_layer) {
-            case LAYER_NAVIGATION:
-            case LAYER_POINTER:
+        switch (dashboard_data.view) {
+            case SCREEN_DASHBOARD_POINTER:
                 lv_obj_clear_flag(cont_pointer_view, LV_OBJ_FLAG_HIDDEN);
                 break;
-            case LAYER_MEDIA:
+            case SCREEN_DASHBOARD_MEDIA:
                 lv_obj_clear_flag(cont_media_view, LV_OBJ_FLAG_HIDDEN);
                 break;
             default:
@@ -644,11 +626,11 @@ void housekeeping_custom_dashboard(void) {
 
 #ifdef RGB_MATRIX_ENABLE
     if (layer_changed || layer_color_changed) {
-        update_layer_display(highest_layer);
+        update_layer_display(&dashboard_data);
     }
 #else
     if (layer_changed) {
-        update_layer_display(highest_layer);
+        update_layer_display(&dashboard_data);
     }
 #endif
 
@@ -676,24 +658,22 @@ void housekeeping_custom_dashboard(void) {
     // 4. Update the actual data readouts inside the unhidden container
     if (!lv_obj_has_flag(cont_default_view, LV_OBJ_FLAG_HIDDEN)) {
 #ifdef WPM_ENABLE
-        uint8_t  current_wpm    = get_current_wpm();
+        uint8_t  current_wpm    = dashboard_data.wpm;
         uint16_t wpm_percentage = ((uint16_t)current_wpm * 100) / 120;
         update_numeric_display(label_wpm_value, bar_wpm, current_wpm, wpm_percentage > 100 ? 100 : wpm_percentage, true,
                                &wpm_display_cache);
 #endif
     } else if (!lv_obj_has_flag(cont_pointer_view, LV_OBJ_FLAG_HIDDEN)) {
-        uint16_t current_dpi = bkpd_mode_get_dpi(MODE_NORMAL);
-        update_numeric_display(label_dpi_val, bar_dpi, current_dpi,
-                               value_percentage(current_dpi, bkpd_get_minimum_default_dpi(), bkpd_get_maximum_default_dpi()), true,
+        update_numeric_display(label_dpi_val, bar_dpi, dashboard_data.default_dpi,
+                               value_percentage(dashboard_data.default_dpi, dashboard_data.minimum_default_dpi, dashboard_data.maximum_default_dpi), true,
                                &dpi_display_cache);
 
-        uint16_t current_snipe_dpi = bkpd_mode_get_dpi(MODE_SNIPING);
-        update_numeric_display(label_snipe_val, bar_snipe, current_snipe_dpi,
-                               value_percentage(current_snipe_dpi, bkpd_get_minimum_sniping_dpi(), bkpd_get_maximum_sniping_dpi()), true,
+        update_numeric_display(label_snipe_val, bar_snipe, dashboard_data.sniping_dpi,
+                               value_percentage(dashboard_data.sniping_dpi, dashboard_data.minimum_sniping_dpi, dashboard_data.maximum_sniping_dpi), true,
                                &snipe_display_cache);
     } else if (!lv_obj_has_flag(cont_media_view, LV_OBJ_FLAG_HIDDEN)) {
         // Using standard QMK core API — works perfectly on the left side
-        uint8_t native_lcd_val = get_backlight_level();
+        uint8_t native_lcd_val = dashboard_data.lcd_brightness;
 
 #ifndef BACKLIGHT_LEVELS
 #    define BACKLIGHT_LEVELS 32
@@ -703,8 +683,8 @@ void housekeeping_custom_dashboard(void) {
         update_numeric_display(label_lcd_val, bar_lcd, native_lcd_val, lcd_percentage, true, &lcd_display_cache);
 
 #ifdef RGB_MATRIX_ENABLE
-        bool     rgb_enabled = rgb_matrix_is_enabled();
-        uint16_t rgb_value   = rgb_matrix_get_val();
+        bool     rgb_enabled = dashboard_data.rgb_enabled;
+        uint16_t rgb_value   = dashboard_data.rgb_brightness;
         uint16_t rgb_percentage =
             rgb_enabled ? value_percentage(rgb_value, 0, RGB_MATRIX_MAXIMUM_BRIGHTNESS) : 0;
         update_numeric_display(label_rgb_val, bar_rgb, rgb_value, rgb_percentage, rgb_enabled, &rgb_display_cache);
