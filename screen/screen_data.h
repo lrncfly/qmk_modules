@@ -12,6 +12,7 @@ typedef struct {
     uint8_t layer;
     screen_dashboard_view_t view;
     const char *layer_name;
+    const char *chord_layer_name;
     const char *status_text;
     RGB layer_rgb;
     uint8_t wpm;
@@ -27,3 +28,4 @@ typedef struct {
 } screen_dashboard_data_t;
 
 void lrncfly_screen_get_dashboard_data(screen_dashboard_data_t *data);
+const char *lrncfly_screen_get_chord_layer_name(void);

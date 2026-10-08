@@ -14,5 +14,6 @@ VPATH += $(CURRENT_DIR)
 
 # Module source files
 SRC += display.c
+SRC += chord_tracker.c
 SRC += ui_elements.c
 SRC += theme.c  # if ui_elements depends on theme
