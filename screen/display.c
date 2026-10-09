@@ -71,6 +71,10 @@ static RGB last_displayed_layer_rgb;
 static bool displayed_layer_rgb_valid;
 #endif
 
+static uint8_t get_active_mods(void) {
+    return get_mods() | get_weak_mods() | get_oneshot_mods();
+}
+
 static void update_layer_display(const screen_dashboard_data_t *data) {
     lv_label_set_text(label_status_tag, data->status_text);
     lv_label_set_text(chord_layer_label, data->layer_name);
@@ -331,7 +335,7 @@ static void render_chord_tracker_updates(void) {
 void screen_process_keycode(uint16_t keycode, keyrecord_t *record) {
     if (!is_keyboard_left()) return;
 
-    chord_tracker_process_keycode(keycode, record, get_mods() | get_oneshot_mods(),
+    chord_tracker_process_keycode(keycode, record, get_active_mods(),
                                   host_keyboard_led_state().caps_lock, lrncfly_screen_get_chord_layer_name());
     render_chord_tracker_updates();
 }
@@ -356,7 +360,7 @@ void housekeeping_custom_dashboard(void) {
     // 1. Resolve active keyboard state through the keymap data adapter
     screen_dashboard_data_t dashboard_data;
     lrncfly_screen_get_dashboard_data(&dashboard_data);
-    chord_tracker_housekeeping(get_mods() | get_oneshot_mods(), dashboard_data.chord_layer_name);
+    chord_tracker_housekeeping(get_active_mods(), dashboard_data.chord_layer_name);
     render_chord_tracker_updates();
     uint8_t highest_layer = dashboard_data.layer;
 

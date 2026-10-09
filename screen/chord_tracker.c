@@ -342,9 +342,9 @@ static void remember_terminal_event(const keyrecord_t *record, uint16_t keycode)
 }
 
 static void record_terminal_key(uint16_t keycode, keyrecord_t *record, uint8_t mods, bool caps_lock,
-                               const char *layer_name, bool standalone_dual_role_tap) {
+                               uint8_t keycode_mods, const char *layer_name) {
     bool context_active = has_context(mods, layer_name);
-    if (!context_active && !standalone_dual_role_tap) {
+    if (!context_active) {
         sequence_active = false;
         set_overlay("", false, false, false);
         return;
@@ -356,7 +356,7 @@ static void record_terminal_key(uint16_t keycode, keyrecord_t *record, uint8_t m
     remember_terminal_event(record, keycode);
 
     char terminal_key[16];
-    format_terminal_key(keycode, mods, caps_lock, terminal_key, sizeof(terminal_key));
+    format_terminal_key(keycode, mods | keycode_mods, caps_lock, terminal_key, sizeof(terminal_key));
 
     char stroke_history[CHORD_TRACKER_TEXT_SIZE];
     char stroke_overlay[CHORD_TRACKER_TEXT_SIZE];
@@ -395,10 +395,13 @@ static void record_terminal_key(uint16_t keycode, keyrecord_t *record, uint8_t m
         char next_overlay[CHORD_TRACKER_TEXT_SIZE];
         snprintf(next_history, sizeof(next_history), "%s", sequence_history);
         snprintf(next_overlay, sizeof(next_overlay), "%s", sequence_overlay);
+        bool layer_context_active = sequence_layer[0] != '\0';
         if (!append_text(next_history, sizeof(next_history), " ") ||
-            !append_text(next_history, sizeof(next_history), stroke_history) ||
-            !append_text(next_overlay, sizeof(next_overlay), " / ") ||
-            !append_text(next_overlay, sizeof(next_overlay), stroke_overlay)) {
+            !append_text(next_history, sizeof(next_history),
+                         layer_context_active ? terminal_key : stroke_history) ||
+            !append_text(next_overlay, sizeof(next_overlay), layer_context_active ? " " : " / ") ||
+            !append_text(next_overlay, sizeof(next_overlay),
+                         layer_context_active ? terminal_key : stroke_overlay)) {
             begin_sequence(mods, layer_name, stroke_history, stroke_overlay, record->event.time, timestamp, context_active);
             return;
         }
@@ -441,24 +444,26 @@ void chord_tracker_init(void) {
 
 void chord_tracker_process_keycode(uint16_t keycode, keyrecord_t *record, uint8_t mods, bool caps_lock,
                                    const char *layer_name) {
+    uint8_t keycode_mods = 0;
+    if (IS_QK_MODS(keycode)) {
+        keycode_mods = QK_MODS_GET_MODS(keycode);
+        keycode = QK_MODS_GET_BASIC_KEYCODE(keycode);
+    }
     update_modifier_order(mods);
     if (sequence_active && !context_matches(mods, layer_name)) {
         sequence_active = false;
     }
 
-    bool standalone_dual_role_tap = false;
     if (IS_QK_MOD_TAP(keycode)) {
         if (record->event.pressed || !record->tap.count) {
             return;
         }
         keycode = QK_MOD_TAP_GET_TAP_KEYCODE(keycode);
-        standalone_dual_role_tap = true;
     } else if (IS_QK_LAYER_TAP(keycode)) {
         if (record->event.pressed || !record->tap.count) {
             return;
         }
         keycode = QK_LAYER_TAP_GET_TAP_KEYCODE(keycode);
-        standalone_dual_role_tap = true;
     } else if (!record->event.pressed) {
         return;
     }
@@ -470,7 +475,7 @@ void chord_tracker_process_keycode(uint16_t keycode, keyrecord_t *record, uint8_
         return;
     }
 
-    record_terminal_key(keycode, record, mods, caps_lock, layer_name, standalone_dual_role_tap);
+    record_terminal_key(keycode, record, mods, caps_lock, keycode_mods, layer_name);
 }
 
 void chord_tracker_housekeeping(uint8_t mods, const char *layer_name) {
