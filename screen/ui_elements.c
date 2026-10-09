@@ -2,6 +2,7 @@
 #include "ui_elements.h"
 #include "lvgl.h"
 #include "screen.h"
+#include "theme.h"
 
 lv_obj_t *ui_create_container(lv_obj_t *parent) {
     lv_obj_t *cont = lv_obj_create(parent);

@@ -2,6 +2,7 @@
 #include "screen.h"
 #include "screen_data.h"
 #include "chord_tracker.h"
+#include "theme.h"
 #include "lvgl.h"
 #include "qp.h"
 #include "color.h"
@@ -444,17 +445,3 @@ void housekeeping_custom_dashboard(void) {
 #endif
     }
 }
-
-void set_current_module(uint8_t module_index) {
-    // Stub: Currently does nothing
-}
-
-// Global Export Structure
-lcd_module_t lcd_module_dashboard = {
-    .init_module                                      = &init_custom_dashboard,
-    .load_custom_theme_elements                       = NULL,
-    .load_module                                      = &load_custom_dashboard,
-    .update_custom_elements_styles_from_current_theme = NULL,
-    .process_record                                   = NULL,
-    .housekeeping_task                                = &housekeeping_custom_dashboard,
-};
